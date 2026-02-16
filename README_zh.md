@@ -39,6 +39,9 @@
 | 操作系统   | macOS（Apple Silicon M1 / M2 / M3 / M4）       |
 | Python     | >= 3.13                                        |
 | 包管理器   | [uv](https://docs.astral.sh/uv/)              |
+| FFmpeg     | 推荐安装：`brew install ffmpeg`                |
+
+> FFmpeg 用于支持 M4A、AAC、OGG 等音频格式（如微信语音、iPhone 录音等）。WAV、MP3、FLAC 无需 FFmpeg 即可使用。
 
 ## 快速开始
 

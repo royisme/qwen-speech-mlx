@@ -17,6 +17,9 @@ Local TTS (text-to-speech) and ASR (speech-to-text) services for Apple Silicon, 
 - macOS (Apple Silicon M1/M2/M3/M4)
 - Python >= 3.13
 - [uv](https://docs.astral.sh/uv/) package manager
+- [FFmpeg](https://ffmpeg.org/) (recommended): `brew install ffmpeg`
+  - Required for M4A, AAC, OGG audio input (e.g. WeChat voice, iPhone recordings)
+  - WAV, MP3, FLAC work without FFmpeg
 
 ## Quick Start
 

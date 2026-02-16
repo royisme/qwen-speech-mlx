@@ -1,63 +1,103 @@
 ---
-name: qwen-tts
-description: Generate high-quality speech with "Voice Design" (natural language prompts) using Qwen3-TTS locally.
-metadata: {"clawdbot":{"emoji":"🗣️","requires":{"python":">=3.10","env":["UV_PYTHON"]},"primaryEnv":null}}
+name: qwen-speech
+description: Local TTS (text-to-speech) and ASR (speech-to-text) services for Apple Silicon, powered by Qwen3 + MLX.
+metadata: {"clawdbot":{"emoji":"🎙️","requires":{"python":">=3.13","system":["ffmpeg"]},"primaryEnv":null}}
 ---
 
-# Qwen3-TTS
+# Qwen Speech MLX
 
-Generate speech using the Qwen3-TTS model. This skill uses the **1.7B VoiceDesign** model by default, allowing you to "design" the voice using natural language descriptions.
+Local speech services providing **TTS** (text-to-speech with voice cloning) and **ASR** (speech-to-text) via Qwen3 models on Apple Silicon.
 
-## Usage
+## Prerequisites
+
+1. **uv** package manager installed
+2. **FFmpeg** installed (recommended): `brew install ffmpeg`
+   - Required for M4A, AAC, OGG audio formats (common in WeChat voice messages, iPhone recordings, etc.)
+   - WAV, MP3, FLAC work without FFmpeg
+3. Services must be running before tool use:
 
 ```bash
-# Basic usage (defaults to a clear voice)
-uv run /Users/royzhu/software/mytools/python/qwen-tts/qwen.py "你好，我是 Qwen TTS。"
-
-# With Voice Design (The killer feature!)
-uv run /Users/royzhu/software/mytools/python/qwen-tts/qwen.py "你给我听好了，这事没完！" --instruct "一个极其愤怒、咆哮的中年男人，语气急促"
-
-# Specify language
-uv run /Users/royzhu/software/mytools/python/qwen-tts/qwen.py "Hello world" --lang English --instruct "A calm British narrator"
-
-# Save to file (no playback)
-uv run /Users/royzhu/software/mytools/python/qwen-tts/qwen.py "Test" --output /tmp/test.wav
-
-# Send to Telegram (requires TELEGRAM_CHAT_ID env var)
-TELEGRAM_CHAT_ID="1282978471" uv run /Users/royzhu/software/mytools/python/qwen-tts/qwen.py "测试发送"
+cd /Users/royzhu/software/mytools/python/qwen-tts
+make start-all    # Start TTS (:9955) + ASR (:9956) in background
 ```
 
-## Setup
+## Services
 
-1. Ensure `uv` is installed.
-2. The service runs on port `9955`. It will auto-start on the first request.
-3. **Note**: The first run will download the 1.7B model (~3-4GB), which may take time.
+| Service | Port | Endpoint      | Description                |
+|---------|------|---------------|----------------------------|
+| TTS     | 9955 | POST /v1/tts  | Text to speech (voice clone) |
+| ASR     | 9956 | POST /v1/asr  | Speech to text (multi-language) |
 
-## Voice Design Tips
+## Usage Examples
 
-The `--instruct` parameter is powerful. Try including:
-- **Gender/Age**: "Young girl", "Old man", "Middle-aged woman"
-- **Emotion**: "Sad", "Happy", "Angry", "Fearful"
-- **Tone**: "Sarcastic", "Whispering", "Shouting", "Professional"
-- **Accent**: "Beijing accent", "Sichuan dialect" (works best if language is set to Chinese)
+```bash
+# TTS: generate speech
+curl -s http://127.0.0.1:9955/v1/tts \
+  -H "Content-Type: application/json" \
+  -d '{"text": "你好"}' | jq .audio_path
 
-Example:
-> "一个非常阴阳怪气的年轻女性，说话拖长音，带有嘲讽的笑意"
+# ASR: transcribe audio
+curl -s http://127.0.0.1:9956/v1/asr \
+  -F "audio=@recording.wav" \
+  -F "language=Chinese" | jq .text
+
+# Service management
+make status-all   # Check if services are running
+make stop-all     # Stop services
+```
+
+## Audio Format Support
+
+| Format         | Support     | FFmpeg Required |
+|----------------|-------------|-----------------|
+| WAV            | Native      | No              |
+| MP3            | Native      | No              |
+| FLAC           | Native      | No              |
+| M4A / AAC      | Via FFmpeg  | Yes             |
+| OGG            | Via FFmpeg  | Yes             |
+
+## ASR Supported Languages
+
+Chinese, English, Japanese, Korean, German, Spanish, French, Italian, Portuguese, Russian, Cantonese
 
 [tool]
 name: speak
-description: Speak text using Roy's cloned voice (or others). Use this to reply with voice messages on Telegram. The audio will be automatically sent to the chat.
+description: Convert text to speech using voice cloning. Returns the path to the generated WAV audio file. The TTS service must be running (make start-tts).
 parameters:
   type: object
   properties:
     text:
       type: string
-      description: The text to speak.
-    instruct:
-      type: string
-      description: (Optional) Voice description/instruction (e.g., "Sad", "Excited"). Only works if model is NOT set to BASE (clone).
+      description: The text to synthesize into speech.
   required:
     - text
 command: |
-  cd /Users/royzhu/software/mytools/python/qwen-tts
-  TELEGRAM_CHAT_ID="1282978471" uv run /Users/royzhu/software/mytools/python/qwen-tts/qwen.py "${text}" --instruct "${instruct:-A clear voice.}"
+  RESPONSE=$(curl -s -X POST http://127.0.0.1:9955/v1/tts \
+    -H "Content-Type: application/json" \
+    -d "{\"text\": \"${text}\"}")
+  AUDIO_PATH=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['audio_path'])")
+  DURATION=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f\"{d['duration']:.1f}s processing, {d['audio_duration']:.1f}s audio\")")
+  echo "Generated: $AUDIO_PATH ($DURATION)"
+  afplay "$AUDIO_PATH"
+
+[tool]
+name: transcribe
+description: Transcribe an audio file to text using ASR. Supports WAV, MP3, FLAC natively; M4A/AAC/OGG require FFmpeg. The ASR service must be running (make start-asr).
+parameters:
+  type: object
+  properties:
+    audio:
+      type: string
+      description: Path to the audio file to transcribe.
+    language:
+      type: string
+      description: "Language of the audio. Options: Chinese (default), English, Japanese, Korean, German, Spanish, French, Italian, Portuguese, Russian, Cantonese."
+  required:
+    - audio
+command: |
+  RESPONSE=$(curl -s -X POST http://127.0.0.1:9956/v1/asr \
+    -F "audio=@${audio}" \
+    -F "language=${language:-Chinese}")
+  TEXT=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['text'])")
+  DURATION=$(echo "$RESPONSE" | python3 -c "import sys,json; print(f\"{json.load(sys.stdin)['duration']:.2f}s\")")
+  echo "Transcription ($DURATION): $TEXT"
