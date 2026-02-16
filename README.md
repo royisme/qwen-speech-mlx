@@ -22,7 +22,7 @@ Local TTS (text-to-speech) and ASR (speech-to-text) services for Apple Silicon, 
 
 ```bash
 # 1. Clone and install
-git clone <repo-url> && cd qwen-speech
+git clone https://github.com/royisme/qwen-speech-mlx.git && cd qwen-speech-mlx
 uv sync
 
 # 2. Start services

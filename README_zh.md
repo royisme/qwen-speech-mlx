@@ -44,7 +44,7 @@
 
 ```bash
 # 1. 克隆并安装
-git clone <repo-url> && cd qwen-speech
+git clone https://github.com/royisme/qwen-speech-mlx.git && cd qwen-speech-mlx
 uv sync
 
 # 2. 启动服务（二选一）
